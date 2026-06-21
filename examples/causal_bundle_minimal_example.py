@@ -1,4 +1,4 @@
-from causalbundle.system.geometric_system import CausalGeometricSystem
+from causal_bundle.system.geometric_system import CausalGeometricSystem
 
 system = CausalGeometricSystem(
     environments=envs,        # from 4.2

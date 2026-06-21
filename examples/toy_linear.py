@@ -1,9 +1,9 @@
 # causalbundle/examples/toy_linear.py
 
 import numpy as np
-from causalbundle.core.graph import CausalGraph
-from causalbundle.core.fiber import SymbolicFiber
-from causalbundle.symbolic.pysr_interface import PySRMechanismModel
+from causal_bundle.core.graph import CausalGraph
+from causal_bundle.core.fiber import SymbolicFiber
+from causal_bundle.symbolic.pysr_interface import PySRMechanismModel
 
 # graph: X -> Y
 G = CausalGraph(edges=[("X", "Y")])

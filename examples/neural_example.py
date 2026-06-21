@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from causalbundle.empirical.neural_encoder import EmpiricalStructureEncoder
+from causal_bundle.empirical.neural_encoder import EmpiricalStructureEncoder
 
 X = np.random.randn(100, 3)
 
