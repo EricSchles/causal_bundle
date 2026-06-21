@@ -1,0 +1,14 @@
+[project]
+name = "causal_bundle"
+version = "0.1.0"
+description = "Geometric causal inference with symbolic regression fibers"
+dependencies = [
+    "numpy",
+    "networkx",
+    "scikit-learn",
+    "sympy"
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
