@@ -1,42 +1,35 @@
 import numpy as np
-
+import torch
 
 class CausalGeometricSystem:
     """
     4.4: Full integration of empirical + invariance + neural + symbolic layers.
-
-    This does NOT redefine previous components.
-    It ONLY orchestrates them.
+    Orchestrates the components cleanly.
     """
 
-    def __init__(self, environments, encoder=None, pysr_model=None):
-        self.environments = environments  # 4.2 objects
-        self.encoder = encoder            # 4.3 object
-        self.pysr_model = pysr_model      # symbolic regression engine
-
-        self.fibers = {}  # graph/env -> symbolic model
+    def __init__(self, environments, encoder=None, symbolic_backend=None, latent_dim=None, output_dim=None):
+        self.environments = environments  
+        self.encoder = encoder            
+        self.symbolic_backend = symbolic_backend  # Step 6 Abstraction
+        self.fibers = {}                  # graph/env -> symbolic model
+        
+        # Step 7 Proxy Hook
+        self.surrogate = None
+        if encoder is not None and latent_dim is not None and output_dim is not None:
+            from causal_bundle.surrogates.symbolic_surrogate import SymbolicSurrogate
+            self.surrogate = SymbolicSurrogate(input_dim=latent_dim)
 
     def compute_empirical_views(self, X):
-        """
-        Pull raw empirical structure from all environments.
-        (Uses 4.1 models only)
-        """
-
         return {
             env.name: env.model.predict_obs(X)
             for env in self.environments
         }
 
     def compute_invariance_field(self, X):
-        """
-        Measures geometric consistency across environments.
-        """
-
         means = np.array([
             env.model.predict_obs(X).mean()
             for env in self.environments
         ])
-
         return {
             "mean_field": means,
             "variance": np.var(means),
@@ -44,46 +37,35 @@ class CausalGeometricSystem:
         }
 
     def compute_latent_geometry(self, X):
-        """
-        Projects data into learned causal coordinate system.
-        """
-
+        """Standard NumPy inference endpoint for the pipeline."""
         if self.encoder is None:
             raise ValueError("Encoder not provided (4.3 required)")
 
-        import torch
-
-        X_t = torch.tensor(X, dtype=torch.float32)
-        Z = self.encoder(X_t).detach().numpy()
-
+        self.encoder.eval()
+        with torch.no_grad():
+            if isinstance(X, np.ndarray):
+                X_t = torch.tensor(X, dtype=torch.float32)
+            else:
+                X_t = X.float()
+            Z = self.encoder(X_t).cpu().numpy()
         return Z
 
-    def fit_symbolic_fibers(self, X, Y):
-        """
-        Fit symbolic mechanisms in latent space.
-        """
-
+    def fit_symbolic_fibers(self, X, Y, env_idx=None):
+        """Fit symbolic mechanisms in latent space using abstract backend."""
         Z = self.compute_latent_geometry(X)
 
-        if self.pysr_model is None:
-            raise ValueError("PySR model not provided")
+        if self.symbolic_backend is None:
+            raise ValueError("Symbolic backend wrapper not provided")
 
-        model = self.pysr_model.fit(Z, Y)
+        if env_idx is None:
+            env_idx = np.zeros((len(X), 1))
 
-        self.fibers["global"] = model
+        self.symbolic_backend.fit(Z, Y, env_idx)
+        self.fibers["global"] = self.symbolic_backend
 
-        return model
+        return self.symbolic_backend
 
     def run_full_pipeline(self, X, Y):
-        """
-        Executes full causal geometric pipeline:
-
-        1. Empirical estimation (4.1)
-        2. Invariance field (4.2)
-        3. Latent embedding (4.3)
-        4. Symbolic regression (PySR)
-        """
-
         empirical = self.compute_empirical_views(X)
         invariance = self.compute_invariance_field(X)
         Z = self.compute_latent_geometry(X)
