@@ -35,15 +35,12 @@ class JointCausalOptimizer(BaseCausalOptimizer):
 
     def _symbolic_step(self, system, X_np, Y_np, env_idx_np):
         """Phase A: Update the true symbolic model based on the frozen geometry."""
-        # Compute latent coordinates safely in eval/inference mode
-        system.encoder.eval()
-        with torch.no_grad():
-            X_t = torch.tensor(X_np, dtype=torch.float32)
-            Z_np = system.compute_latent_geometry(X_t).cpu().numpy()
-
-        # Update the decoupled symbolic backend
-        system.symbolic_backend.fit(Z_np, Y_np, env_idx_np)
-        system.fibers["global"] = system.symbolic_backend
+        # Cleanly fit the symbolic structures using the system orchestrator
+        # (This internally calls compute_latent_geometry)
+        system.fit_symbolic_fibers(X_np, Y_np, env_idx_np)
+        
+        # Grab the computed coordinates directly
+        Z_np = system.compute_latent_geometry(X_np)
         
         return Z_np, system
 
@@ -72,7 +69,10 @@ class JointCausalOptimizer(BaseCausalOptimizer):
     def _compute_symmetric_loss(self, system, X_t, Y_t, env_idx_t, stability):
         """Calculates L_pred + lambda * L_IRM down through the surrogate proxy graph."""
         # Keep the graph connected directly back to the encoder weights!
-        Z_t = system.compute_latent_geometry(X_t) 
+        Z_t = system.compute_latent_geometry(X_t)
+        if isinstance(Z_t, np.ndarray):
+            Z_t = torch.from_numpy(Z_t).float().to(X_t.device)
+            Z_t.requires_grad_(True)
         Y_hat = system.surrogate(Z_t)
         
         # 1. Base Prediction Loss
